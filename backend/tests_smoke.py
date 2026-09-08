@@ -100,6 +100,13 @@ def test_task_validation():
     response = client.post("/automation/", json={"title": "Task", "due_at": "not-a-date"})
     assert response.status_code == 422
 
+    created = client.post("/automation/", json={"title": "Valid task"})
+    assert created.status_code == 200
+    task_id = created.json()["id"]
+    blank_update = client.put(f"/automation/{task_id}", json={"title": "   "})
+    assert blank_update.status_code == 422
+    client.delete(f"/automation/{task_id}")
+
 
 def test_research_validation():
     response = client.get("/research/search", params={"q": "FastAPI"})
