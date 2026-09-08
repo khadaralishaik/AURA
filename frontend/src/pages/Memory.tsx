@@ -12,7 +12,10 @@ export default function Memory() {
     setItems(data);
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const add = async () => {
     const value = text.trim();

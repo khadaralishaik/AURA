@@ -13,7 +13,10 @@ export default function Tasks() {
     setItems(data);
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const add = async () => {
     const value = title.trim();
