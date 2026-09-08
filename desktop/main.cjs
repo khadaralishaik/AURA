@@ -1,7 +1,35 @@
-const { app, BrowserWindow, session } = require("electron");
+const { app, BrowserWindow, Menu, Tray, globalShortcut, nativeImage, session } = require("electron");
 const path = require("node:path");
 
 const isDev = !app.isPackaged;
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+function trayIcon() {
+  // Small transparent icon keeps the tray item valid without shipping binary assets.
+  return nativeImage.createFromDataURL("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+}
+
+function showAURA() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  tray = new Tray(trayIcon());
+  tray.setToolTip("AURA — AI desktop assistant");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Open AURA", click: showAURA },
+    { label: "Quit AURA", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+  tray.on("double-click", showAURA);
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -20,6 +48,12 @@ function createWindow() {
   });
 
   win.once("ready-to-show", () => win.show());
+  win.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      win.hide();
+    }
+  });
 
   if (isDev) {
     win.loadURL(process.env.AURA_URL || "http://localhost:5173");
@@ -30,26 +64,34 @@ function createWindow() {
   return win;
 }
 
-app.whenReady().then(() => {
-  // Chromium's speech recognition needs microphone permission in the desktop shell.
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(permission === "media" || permission === "microphone");
-  });
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", showAURA);
 
-  if (process.platform === "win32") {
-    app.setLoginItemSettings({
-      openAtLogin: true,
-      path: process.execPath,
+  app.whenReady().then(() => {
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(permission === "media" || permission === "microphone");
     });
-  }
 
-  createWindow();
+    if (process.platform === "win32") {
+      app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
+    }
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    mainWindow = createWindow();
+    createTray();
+    globalShortcut.register("CommandOrControl+Shift+A", showAURA);
+
+    app.on("activate", showAURA);
   });
-});
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+  app.on("will-quit", () => {
+    isQuitting = true;
+    globalShortcut.unregister("CommandOrControl+Shift+A");
+    tray?.destroy();
+  });
+
+  app.on("window-all-closed", () => {
+    // AURA stays alive in the tray so its renderer can keep the voice layer available.
+  });
+}
