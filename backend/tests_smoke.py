@@ -67,6 +67,14 @@ def test_task_lifecycle():
     assert created.json()["completed"] == 0
     assert created.json()["due_at"] == "2026-09-09T10:00:00+05:30"
 
+    updated = client.put(
+        f"/automation/{task_id}",
+        json={"title": "AURA updated task", "due_at": "2026-09-10T11:30:00+05:30"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "AURA updated task"
+    assert updated.json()["due_at"] == "2026-09-10T11:30:00+05:30"
+
     completed = client.post(f"/automation/{task_id}/complete")
     assert completed.status_code == 200
 
@@ -74,8 +82,23 @@ def test_task_lifecycle():
     task = next(item for item in listed.json() if item["id"] == task_id)
     assert task["completed"] == 1
 
-    missing = client.post("/automation/999999999/complete")
-    assert missing.status_code == 404
+    deleted = client.delete(f"/automation/{task_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+
+    missing_update = client.put(f"/automation/{task_id}", json={"title": "missing"})
+    assert missing_update.status_code == 404
+    missing_delete = client.delete(f"/automation/{task_id}")
+    assert missing_delete.status_code == 404
+    missing_complete = client.post(f"/automation/{task_id}/complete")
+    assert missing_complete.status_code == 404
+
+
+def test_task_validation():
+    response = client.post("/automation/", json={"title": "   "})
+    assert response.status_code == 422
+    response = client.post("/automation/", json={"title": "Task", "due_at": "not-a-date"})
+    assert response.status_code == 422
 
 
 def test_research_validation():
