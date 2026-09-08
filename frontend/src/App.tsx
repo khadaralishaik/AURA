@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ChatInput from "./components/chat/ChatInput";
 import ChatWindow from "./components/chat/ChatWindow";
+import GlobalVoiceAgent from "./components/chat/GlobalVoiceAgent";
 import Navbar from "./components/layout/Navbar";
 import Sidebar, { type View } from "./components/layout/Sidebar";
 import Memory from "./pages/Memory";
@@ -15,6 +16,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <GlobalVoiceAgent />
       <Sidebar view={view} setView={setView} />
       <div className="main-shell">
         <Navbar />
