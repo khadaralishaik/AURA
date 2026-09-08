@@ -1,30 +1,52 @@
 import { useEffect, useRef } from "react";
-import ChatBubble from "./ChatBubble";
-import TypingIndicator from "./TypingIndicator";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useChat } from "../../context/ChatContext";
+import TypingIndicator from "./TypingIndicator";
 
-export default function ChatWindow() {
+export default function ChatWindow({ onPrompt }: { onPrompt: (text: string) => void }) {
   const { messages, isTyping } = useChat();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+
+  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages, isTyping]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+    if (localStorage.getItem("aura.voiceOutput") === "false" || !messages.length || !("speechSynthesis" in window)) return;
+    const last = messages[messages.length - 1];
+    if (last.sender !== "assistant") return;
+    window.speechSynthesis.cancel();
+    const clean = last.text.replace(/```[\s\S]*?```/g, "code omitted").replace(/[#*_`>\[\]]/g, "");
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+  }, [messages]);
+
+  if (!messages.length && !isTyping) return (
+    <main className="chat-window empty-state">
+      <div className="aura-orb">A</div>
+      <h1>What can I help you with?</h1>
+      <p>Ask AURA to explain, build, research, plan, remember, or automate.</p>
+      <div className="prompt-grid">
+        <button onClick={() => onPrompt("Explain quantum computing simply")}>Explain something</button>
+        <button onClick={() => onPrompt("Help me plan my day")}>Plan my day</button>
+        <button onClick={() => onPrompt("Write a Python function for a REST API")}>Write code</button>
+      </div>
+    </main>
+  );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-950 p-8">
-      {messages.length === 0 && !isTyping ? (
-        <div className="h-full flex flex-col justify-center items-center">
-          <h1 className="text-5xl font-bold text-cyan-400">Welcome to AURA</h1>
-          <p className="mt-4 text-slate-400 text-lg">Ask me anything...</p>
-        </div>
-      ) : (
-        <div className="space-y-4 max-w-4xl mx-auto">
-          {messages.map((msg) => <ChatBubble key={msg.id} message={msg} />)}
-          {isTyping && <TypingIndicator />}
-          <div ref={bottomRef} />
-        </div>
-      )}
-    </div>
+    <main className="chat-window">
+      <div className="message-list">
+        {messages.map(m => (
+          <article className={`message ${m.sender}`} key={m.id}>
+            <div className="message-avatar">{m.sender === "user" ? "K" : "A"}</div>
+            <div className="message-body">
+              <div className="message-meta">{m.sender === "user" ? "You" : "AURA"}</div>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+            </div>
+          </article>
+        ))}
+        {isTyping && <TypingIndicator />}
+        <div ref={bottom} />
+      </div>
+    </main>
   );
 }
