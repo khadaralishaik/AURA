@@ -27,6 +27,8 @@ jobs:
           node-version: 22
       - name: Install desktop dependencies
         run: npm install --no-audit --no-fund
+      - name: Install frontend dependencies
+        run: npm --prefix ../frontend install --no-audit --no-fund
       - name: Validate Electron main process
         run: node --check main.cjs
       - name: Validate preload

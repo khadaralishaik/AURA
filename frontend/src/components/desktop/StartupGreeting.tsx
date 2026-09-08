@@ -4,6 +4,10 @@ type DesktopWindow = Window & {
   auraDesktop?: { isDesktop?: boolean };
 };
 
+const VOICE_EVENT = "aura:voice-state";
+
+type VoiceState = "listening" | "speaking";
+
 function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
@@ -13,7 +17,11 @@ function greetingForHour(hour: number) {
 function speak(text: string) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  window.dispatchEvent(new CustomEvent(VOICE_EVENT, { detail: "speaking" as VoiceState }));
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.onend = () => window.dispatchEvent(new CustomEvent(VOICE_EVENT, { detail: "listening" as VoiceState }));
+  utterance.onerror = () => window.dispatchEvent(new CustomEvent(VOICE_EVENT, { detail: "listening" as VoiceState }));
+  window.speechSynthesis.speak(utterance);
 }
 
 export default function StartupGreeting() {

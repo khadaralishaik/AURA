@@ -4,6 +4,7 @@ import { useChat } from "../../context/ChatContext";
 type RecognitionResult = {
   resultIndex?: number;
   results: {
+    length: number;
     [index: number]: {
       isFinal?: boolean;
       [index: number]: { transcript?: string };
@@ -29,6 +30,13 @@ type SpeechWindow = Window & {
 };
 
 const WAKE_WORD = "hey aura";
+const VOICE_EVENT = "aura:voice-state";
+
+type VoiceState = "idle" | "listening" | "thinking" | "speaking";
+
+function setVoiceState(state: VoiceState) {
+  window.dispatchEvent(new CustomEvent(VOICE_EVENT, { detail: state }));
+}
 
 function speak(text: string) {
   if (!("speechSynthesis" in window) || !text.trim()) return;
@@ -40,15 +48,22 @@ function commandFromTranscript(transcript: string) {
   const normalized = transcript.trim().toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ");
   const wakeIndex = normalized.indexOf(WAKE_WORD);
   if (wakeIndex < 0) return null;
-  return normalized.slice(wakeIndex + WAKE_WORD.length).trim();
+  const original = transcript.trim().replace(/[.,!?]/g, " ").replace(/\s+/g, " ");
+  const originalWakeIndex = original.toLowerCase().indexOf(WAKE_WORD);
+  return original.slice(originalWakeIndex + WAKE_WORD.length).trim();
 }
 
 export default function GlobalVoiceAgent() {
   const { messages, sendMessage } = useChat();
+  const sendMessageRef = useRef(sendMessage);
   const recognitionRef = useRef<Recognition | null>(null);
   const activeRef = useRef(false);
   const speakingRef = useRef(false);
   const spokenMessageRef = useRef<string | number | null>(null);
+
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   useEffect(() => {
     const speechWindow = window as SpeechWindow;
@@ -62,23 +77,32 @@ export default function GlobalVoiceAgent() {
 
     const restart = () => {
       if (!activeRef.current || speakingRef.current) return;
-      try { recognition.start(); } catch { /* already listening */ }
+      try {
+        recognition.start();
+        setVoiceState("listening");
+      } catch {
+        // Recognition is already running.
+      }
     };
 
     recognition.onresult = (event) => {
       const start = event.resultIndex ?? 0;
-      for (let index = start; index < Object.keys(event.results).length; index += 1) {
+      for (let index = start; index < event.results.length; index += 1) {
         const result = event.results[index];
         if (!result?.isFinal) continue;
-        const transcript = result[0]?.transcript || "";
-        const command = commandFromTranscript(transcript);
+        const command = commandFromTranscript(result[0]?.transcript || "");
         if (command === null) continue;
 
         speakingRef.current = true;
-        try { recognition.stop(); } catch { /* already stopped */ }
+        setVoiceState(command ? "thinking" : "speaking");
+        try {
+          recognition.stop();
+        } catch {
+          // Already stopped.
+        }
 
         if (command) {
-          void sendMessage(command).finally(() => {
+          void sendMessageRef.current(command).finally(() => {
             speakingRef.current = false;
             restart();
           });
@@ -102,10 +126,15 @@ export default function GlobalVoiceAgent() {
     return () => {
       activeRef.current = false;
       speakingRef.current = false;
-      try { recognition.stop(); } catch { /* already stopped */ }
+      setVoiceState("idle");
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped.
+      }
       recognitionRef.current = null;
     };
-  }, [sendMessage]);
+  }, []);
 
   useEffect(() => {
     if (!messages.length) return;
@@ -115,12 +144,22 @@ export default function GlobalVoiceAgent() {
     if (localStorage.getItem("aura.voiceOutput") === "false") return;
 
     speakingRef.current = true;
-    try { recognitionRef.current?.stop(); } catch { /* already stopped */ }
+    setVoiceState("speaking");
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // Already stopped.
+    }
     speak(last.text.replace(/```[\s\S]*?```/g, "code omitted").replace(/[#*_`>\[\]]/g, ""));
     const duration = Math.min(Math.max(last.text.length * 45, 2500), 15000);
     window.setTimeout(() => {
       speakingRef.current = false;
-      try { recognitionRef.current?.start(); } catch { /* already listening */ }
+      setVoiceState("listening");
+      try {
+        recognitionRef.current?.start();
+      } catch {
+        // Already listening.
+      }
     }, duration);
   }, [messages]);
 
