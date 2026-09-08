@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,25 +14,32 @@ def _save_conversation(conversation_id: str | None, request: ChatRequest, reply:
     now = datetime.now(timezone.utc).isoformat()
     with connection() as conn:
         if conversation_id is None:
-            conversation_id = str(uuid4())
-            conn.execute(
-                "INSERT INTO conversations(id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                (conversation_id, request.message[:80].strip(), now, now),
+            cur = conn.execute(
+                "INSERT INTO conversations(title, created_at, updated_at) VALUES (?, ?, ?)",
+                (request.message[:80].strip(), now, now),
             )
+            conversation_id = str(cur.lastrowid)
         else:
-            exists = conn.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,)).fetchone()
+            try:
+                conversation_key = int(conversation_id)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(400, "Invalid conversation id") from exc
+            exists = conn.execute("SELECT id FROM conversations WHERE id = ?", (conversation_key,)).fetchone()
             if not exists:
                 raise HTTPException(404, "Conversation not found")
-            conn.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conversation_id))
+            conversation_id = str(conversation_key)
+            conn.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conversation_key))
 
+        conversation_key = int(conversation_id)
         conn.execute(
             "INSERT INTO messages(conversation_id, sender, text, timestamp) VALUES (?, ?, ?, ?)",
-            (conversation_id, "user", request.message, now),
+            (conversation_key, "user", request.message, now),
         )
         conn.execute(
             "INSERT INTO messages(conversation_id, sender, text, timestamp) VALUES (?, ?, ?, ?)",
-            (conversation_id, "assistant", reply, now),
+            (conversation_key, "assistant", reply, now),
         )
+        conn.commit()
     return conversation_id
 
 
@@ -65,11 +71,21 @@ async def chat(request: ChatRequest):
 def conversations():
     with connection() as conn:
         rows = conn.execute("SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC").fetchall()
-    return [dict(row) for row in rows]
+    return [{**dict(row), "id": str(row["id"])} for row in rows]
 
 
 @router.get("/conversations/{conversation_id}")
 def conversation(conversation_id: str):
+    try:
+        conversation_key = int(conversation_id)
+    except ValueError as exc:
+        raise HTTPException(400, "Invalid conversation id") from exc
     with connection() as conn:
-        rows = conn.execute("SELECT sender, text, timestamp FROM messages WHERE conversation_id = ? ORDER BY id", (conversation_id,)).fetchall()
+        exists = conn.execute("SELECT 1 FROM conversations WHERE id = ?", (conversation_key,)).fetchone()
+        if not exists:
+            raise HTTPException(404, "Conversation not found")
+        rows = conn.execute(
+            "SELECT sender, text, timestamp FROM messages WHERE conversation_id = ? ORDER BY id",
+            (conversation_key,),
+        ).fetchall()
     return [dict(row) for row in rows]

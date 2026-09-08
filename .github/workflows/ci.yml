@@ -23,6 +23,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Compile Python
         run: python -m compileall -q app
+      - name: Run backend tests
+        run: pytest -q tests_smoke.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -36,8 +38,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+      - name: Type check
+        run: npx tsc -b --pretty false
       - name: Lint
         run: npm run lint
       - name: Build

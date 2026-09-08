@@ -4,13 +4,25 @@ import api from "../services/api";
 
 interface Task { id: number; title: string; due_at?: string | null; completed: number; created_at: string }
 
+function formatDue(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function Tasks() {
   const [items, setItems] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const { data } = await api.get<Task[]>("/automation/");
-    setItems(data);
+    try {
+      const { data } = await api.get<Task[]>("/automation/");
+      setItems(data);
+    } catch {
+      setError("Could not load tasks. Check the backend connection.");
+    }
   };
 
   useEffect(() => {
@@ -21,27 +33,40 @@ export default function Tasks() {
   const add = async () => {
     const value = title.trim();
     if (!value) return;
-    await api.post("/automation/", { title: value });
-    setTitle("");
-    await load();
+    setError(null);
+    try {
+      await api.post("/automation/", { title: value, due_at: dueAt ? new Date(dueAt).toISOString() : null });
+      setTitle("");
+      setDueAt("");
+      await load();
+    } catch {
+      setError("Could not save the task. Check the backend connection.");
+    }
   };
 
   const done = async (id: number) => {
-    await api.post(`/automation/${id}/complete`);
-    await load();
+    setError(null);
+    try {
+      await api.post(`/automation/${id}/complete`);
+      await load();
+    } catch {
+      setError("Could not complete the task. Please try again.");
+    }
   };
 
   return (
     <section className="page">
-      <div className="page-head"><div><h1><FaCalendarCheck /> Tasks</h1><p>Simple tasks AURA can keep track of.</p></div></div>
+      <div className="page-head"><div><h1><FaCalendarCheck /> Tasks</h1><p>Tasks AURA can keep track of.</p></div></div>
       <div className="memory-add">
         <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Add a task…" onKeyDown={event => { if (event.key === "Enter") void add(); }} />
-        <button onClick={() => void add()}>Add</button>
+        <input type="datetime-local" value={dueAt} onChange={event => setDueAt(event.target.value)} aria-label="Task due date" />
+        <button onClick={() => void add()} disabled={!title.trim()}>Add</button>
       </div>
+      {error && <div className="error-card">{error}</div>}
       <div className="task-list">
         {items.length ? items.map(task => (
           <div className={task.completed ? "task done" : "task"} key={task.id}>
-            <span>{task.title}</span>
+            <div><span>{task.title}</span>{formatDue(task.due_at) && <small>Due {formatDue(task.due_at)}</small>}</div>
             {!task.completed && <button onClick={() => void done(task.id)} aria-label="Complete task"><FaCheck /></button>}
           </div>
         )) : <div className="empty-card">No tasks yet.</div>}

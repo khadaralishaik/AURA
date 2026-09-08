@@ -17,7 +17,7 @@ def test_calculator_and_persistence():
     payload = response.json()
     assert payload["reply"] == "60"
     assert payload["used_tool"] == "calculator"
-    assert isinstance(payload["conversation_id"], str)
+    assert payload["conversation_id"].isdigit()
 
     conversations = client.get("/chat/conversations")
     assert conversations.status_code == 200
@@ -27,6 +27,20 @@ def test_calculator_and_persistence():
     assert history.status_code == 200
     assert [row["sender"] for row in history.json()] == ["user", "assistant"]
 
+    continued = client.post("/chat/", json={"message": "/calc 2+2", "history": [], "conversation_id": payload["conversation_id"]})
+    assert continued.status_code == 200
+    assert continued.json()["conversation_id"] == payload["conversation_id"]
+
+
+def test_invalid_conversation_id():
+    response = client.post("/chat/", json={"message": "/calc 1+1", "history": [], "conversation_id": "not-an-id"})
+    assert response.status_code == 400
+
+
+def test_missing_conversation():
+    response = client.get("/chat/conversations/999999999")
+    assert response.status_code == 404
+
 
 def test_memory_crud():
     content = "AURA smoke-test memory"
@@ -35,18 +49,23 @@ def test_memory_crud():
     memory_id = created.json()["id"]
 
     listed = client.get("/memory/")
+    assert listed.status_code == 200
     assert any(item["id"] == memory_id for item in listed.json())
 
     deleted = client.delete(f"/memory/{memory_id}")
     assert deleted.status_code == 200
     assert deleted.json()["deleted"] is True
 
+    missing = client.delete(f"/memory/{memory_id}")
+    assert missing.status_code == 404
+
 
 def test_task_lifecycle():
-    created = client.post("/automation/", json={"title": "AURA smoke-test task"})
+    created = client.post("/automation/", json={"title": "AURA smoke-test task", "due_at": "2026-09-09T10:00:00+05:30"})
     assert created.status_code == 200
     task_id = created.json()["id"]
     assert created.json()["completed"] == 0
+    assert created.json()["due_at"] == "2026-09-09T10:00:00+05:30"
 
     completed = client.post(f"/automation/{task_id}/complete")
     assert completed.status_code == 200
@@ -54,3 +73,14 @@ def test_task_lifecycle():
     listed = client.get("/automation/")
     task = next(item for item in listed.json() if item["id"] == task_id)
     assert task["completed"] == 1
+
+    missing = client.post("/automation/999999999/complete")
+    assert missing.status_code == 404
+
+
+def test_research_validation():
+    response = client.get("/research/search", params={"q": "FastAPI"})
+    assert response.status_code in {200, 502}
+    if response.status_code == 200:
+        assert response.json()["query"] == "FastAPI"
+        assert isinstance(response.json()["results"], list)

@@ -4,6 +4,7 @@ import ChatWindow from "./components/chat/ChatWindow";
 import Navbar from "./components/layout/Navbar";
 import Sidebar, { type View } from "./components/layout/Sidebar";
 import Memory from "./pages/Memory";
+import Research from "./pages/Research";
 import Tasks from "./pages/Tasks";
 import Settings from "./pages/Settings";
 import { useChat } from "./context/ChatContext";
@@ -26,6 +27,8 @@ export default function App() {
           <Memory />
         ) : view === "tasks" ? (
           <Tasks />
+        ) : view === "research" ? (
+          <Research />
         ) : (
           <Settings />
         )}
