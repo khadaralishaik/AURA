@@ -18,18 +18,17 @@ function loadMessages(): Message[] {
     if (!stored) return [];
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (message): message is Message =>
-        typeof message === "object" &&
-        message !== null &&
-        typeof (message as Message).id === "number" &&
-        (message as Message).sender === "user" ||
-        (typeof message === "object" && message !== null &&
-          typeof (message as Message).id === "number" &&
-          (message as Message).sender === "assistant") &&
-        typeof (message as Message).text === "string" &&
-        typeof (message as Message).timestamp === "string",
-    );
+
+    return parsed.filter((message): message is Message => {
+      if (typeof message !== "object" || message === null) return false;
+      const candidate = message as Partial<Message>;
+      return (
+        typeof candidate.id === "number" &&
+        (candidate.sender === "user" || candidate.sender === "assistant") &&
+        typeof candidate.text === "string" &&
+        typeof candidate.timestamp === "string"
+      );
+    });
   } catch {
     return [];
   }
