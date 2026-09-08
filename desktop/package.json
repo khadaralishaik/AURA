@@ -1,0 +1,43 @@
+{
+  "name": "aura-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AURA desktop companion for Windows startup and native voice activation",
+  "main": "main.cjs",
+  "scripts": {
+    "build:web": "npm --prefix ../frontend run build",
+    "start": "npm run build:web && electron .",
+    "dist": "npm run build:web && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^38.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.aura.assistant",
+    "productName": "AURA",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "../frontend/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "native/wake-word.ps1",
+        "to": "wake-word.ps1"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    }
+  }
+}

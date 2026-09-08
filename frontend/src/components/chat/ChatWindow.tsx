@@ -12,19 +12,6 @@ export default function ChatWindow({ onPrompt }: { onPrompt: (text: string) => v
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  useEffect(() => {
-    if (localStorage.getItem("aura.voiceOutput") === "false" || !messages.length) return;
-    const last = messages[messages.length - 1];
-    if (last.sender !== "assistant" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const clean = last.text
-      .replace(/```[\s\S]*?```/g, "code omitted")
-      .replace(/[#*_`>]/g, "")
-      .replace(/\[/g, "")
-      .replace(/\]/g, "");
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
-  }, [messages]);
-
   if (!messages.length && !isTyping) {
     return (
       <main className="chat-window empty-state">
