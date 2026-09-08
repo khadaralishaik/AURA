@@ -1,0 +1,37 @@
+name: AURA Desktop Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'frontend/**'
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'frontend/**'
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install desktop dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate Electron main process
+        run: node --check main.cjs
+      - name: Validate preload
+        run: node --check preload.cjs
+      - name: Build frontend
+        run: npm run build:web
+      - name: Validate packaged app configuration
+        run: npx electron-builder --dir --linux
