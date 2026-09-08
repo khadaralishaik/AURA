@@ -15,7 +15,11 @@ export default function ChatWindow({ onPrompt }: { onPrompt: (text: string) => v
     const last = messages[messages.length - 1];
     if (last.sender !== "assistant") return;
     window.speechSynthesis.cancel();
-    const clean = last.text.replace(/```[\s\S]*?```/g, "code omitted").replace(/[#*_`>\[\]]/g, "");
+    const clean = last.text
+      .replace(/```[\s\S]*?```/g, "code omitted")
+      .replace(/[#*_`>]/g, "")
+      .replace(/\[/g, "")
+      .replace(/\]/g, "");
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
   }, [messages]);
 

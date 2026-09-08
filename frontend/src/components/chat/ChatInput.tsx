@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaMicrophone, FaPaperPlane } from "react-icons/fa";
 import { useChat } from "../../context/ChatContext";
 
-type SpeechRecognitionResultEvent = Event & {
-  results: SpeechRecognitionResultList;
-};
-
+type SpeechRecognitionResultEvent = Event & { results: SpeechRecognitionResultList };
 type SpeechRecognitionInstance = {
   continuous: boolean;
   interimResults: boolean;
@@ -16,9 +13,7 @@ type SpeechRecognitionInstance = {
   onend: (() => void) | null;
   onerror: (() => void) | null;
 };
-
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
-
 type SpeechWindow = Window & typeof globalThis & {
   SpeechRecognition?: SpeechRecognitionConstructor;
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
@@ -27,18 +22,14 @@ type SpeechWindow = Window & typeof globalThis & {
 export default function ChatInput() {
   const [text, setText] = useState("");
   const [isListening, setIsListening] = useState(false);
-  const [voiceSupported, setVoiceSupported] = useState(true);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const { sendMessage } = useChat();
+  const speechWindow = window as SpeechWindow;
+  const voiceSupported = Boolean(speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition);
 
   useEffect(() => {
-    const speechWindow = window as SpeechWindow;
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      setVoiceSupported(false);
-      return;
-    }
-
+    if (!Recognition) return;
     const recognition = new Recognition();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -50,7 +41,6 @@ export default function ChatInput() {
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
     recognitionRef.current = recognition;
-
     return () => {
       recognition.stop();
       recognitionRef.current = null;
@@ -65,11 +55,7 @@ export default function ChatInput() {
       return;
     }
     setIsListening(true);
-    try {
-      recognition.start();
-    } catch {
-      setIsListening(false);
-    }
+    try { recognition.start(); } catch { setIsListening(false); }
   };
 
   const handleSend = async () => {
@@ -100,18 +86,11 @@ export default function ChatInput() {
           disabled={!voiceSupported}
           aria-label={voiceSupported ? "Voice input" : "Voice input is not supported in this browser"}
           title={voiceSupported ? (isListening ? "Stop listening" : "Speak to AURA") : "Voice input is not supported in this browser"}
-          className={`p-4 rounded-xl transition ${
-            isListening ? "bg-red-500 hover:bg-red-600" : "bg-cyan-500 hover:bg-cyan-600"
-          } disabled:cursor-not-allowed disabled:opacity-40`}
+          className={`p-4 rounded-xl transition ${isListening ? "bg-red-500 hover:bg-red-600" : "bg-cyan-500 hover:bg-cyan-600"} disabled:cursor-not-allowed disabled:opacity-40`}
         >
           <FaMicrophone />
         </button>
-        <button
-          type="button"
-          onClick={() => void handleSend()}
-          aria-label="Send message"
-          className="bg-cyan-500 hover:bg-cyan-600 p-4 rounded-xl transition"
-        >
+        <button type="button" onClick={() => void handleSend()} aria-label="Send message" className="bg-cyan-500 hover:bg-cyan-600 p-4 rounded-xl transition">
           <FaPaperPlane />
         </button>
       </div>

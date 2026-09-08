@@ -48,7 +48,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     try { const { data } = await api.get<Conversation[]>("/chat/conversations"); setConversations(data); } catch { /* offline is handled by chat itself */ }
   }, []);
 
-  useEffect(() => { void refreshConversations(); }, [refreshConversations]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void refreshConversations(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshConversations]);
 
   const sendMessage = useCallback(async (text: string) => {
     const value = text.trim();
@@ -70,7 +73,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [conversationId, isTyping, messages, refreshConversations]);
 
   const newChat = useCallback(() => { setMessages([]); setConversationId(null); setError(null); localStorage.removeItem(STORAGE_KEY); }, []);
-  const clearChat = newChat;
+  const clearChat = useCallback(() => { newChat(); }, [newChat]);
 
   const loadConversation = useCallback(async (id: number) => {
     const { data } = await api.get<Message[]>(`/chat/conversations/${id}`);
@@ -79,7 +82,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
-  const value = useMemo(() => ({ messages, conversations, conversationId, isTyping, error, sendMessage, newChat, clearChat, loadConversation, refreshConversations }), [messages, conversations, conversationId, isTyping, error, sendMessage, newChat, loadConversation, refreshConversations]);
+  const value = useMemo(() => ({ messages, conversations, conversationId, isTyping, error, sendMessage, newChat, clearChat, loadConversation, refreshConversations }), [messages, conversations, conversationId, isTyping, error, sendMessage, newChat, clearChat, loadConversation, refreshConversations]);
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
