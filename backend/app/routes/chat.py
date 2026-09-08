@@ -1,22 +1,25 @@
 from datetime import datetime, timezone
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException
+
+from app.database.db import connection
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.llm import ask_ai
 from app.services.tools import calculate, current_time
-from app.database.db import connection
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
-def _save_conversation(conversation_id: int | None, request: ChatRequest, reply: str) -> int:
+def _save_conversation(conversation_id: str | None, request: ChatRequest, reply: str) -> str:
     now = datetime.now(timezone.utc).isoformat()
     with connection() as conn:
         if conversation_id is None:
-            cur = conn.execute(
-                "INSERT INTO conversations(title, created_at, updated_at) VALUES (?, ?, ?)",
-                (request.message[:80].strip(), now, now),
+            conversation_id = str(uuid4())
+            conn.execute(
+                "INSERT INTO conversations(id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (conversation_id, request.message[:80].strip(), now, now),
             )
-            conversation_id = int(cur.lastrowid)
         else:
             exists = conn.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,)).fetchone()
             if not exists:
@@ -31,7 +34,6 @@ def _save_conversation(conversation_id: int | None, request: ChatRequest, reply:
             "INSERT INTO messages(conversation_id, sender, text, timestamp) VALUES (?, ?, ?, ?)",
             (conversation_id, "assistant", reply, now),
         )
-        conn.commit()
     return conversation_id
 
 
@@ -62,17 +64,12 @@ async def chat(request: ChatRequest):
 @router.get("/conversations")
 def conversations():
     with connection() as conn:
-        rows = conn.execute(
-            "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
-        ).fetchall()
-    return [dict(r) for r in rows]
+        rows = conn.execute("SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC").fetchall()
+    return [dict(row) for row in rows]
 
 
 @router.get("/conversations/{conversation_id}")
-def conversation(conversation_id: int):
+def conversation(conversation_id: str):
     with connection() as conn:
-        rows = conn.execute(
-            "SELECT sender, text, timestamp FROM messages WHERE conversation_id = ? ORDER BY id",
-            (conversation_id,),
-        ).fetchall()
-    return [dict(r) for r in rows]
+        rows = conn.execute("SELECT sender, text, timestamp FROM messages WHERE conversation_id = ? ORDER BY id", (conversation_id,)).fetchall()
+    return [dict(row) for row in rows]

@@ -22,7 +22,13 @@ export default function App() {
             <ChatWindow onPrompt={(text) => void sendMessage(text)} />
             <ChatInput />
           </>
-        ) : view === "memory" ? <Memory /> : view === "tasks" ? <Tasks /> : <Settings />}
+        ) : view === "memory" ? (
+          <Memory />
+        ) : view === "tasks" ? (
+          <Tasks />
+        ) : (
+          <Settings />
+        )}
       </div>
     </div>
   );

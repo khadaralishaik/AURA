@@ -1,16 +1,20 @@
-import Sidebar from "../components/layout/Sidebar";
-import Navbar from "../components/layout/Navbar";
-import ChatWindow from "../components/chat/ChatWindow";
+import { useState } from "react";
 import ChatInput from "../components/chat/ChatInput";
+import ChatWindow from "../components/chat/ChatWindow";
+import Navbar from "../components/layout/Navbar";
+import Sidebar, { type View } from "../components/layout/Sidebar";
+import { useChat } from "../context/ChatContext";
 
 export default function Home() {
+  const [view, setView] = useState<View>("chat");
+  const { sendMessage } = useChat();
+
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="app-shell">
+      <Sidebar view={view} setView={setView} />
+      <div className="main-shell">
         <Navbar />
-        <ChatWindow />
-        <ChatInput />
+        {view === "chat" ? <><ChatWindow onPrompt={(text) => void sendMessage(text)} /><ChatInput /></> : null}
       </div>
     </div>
   );

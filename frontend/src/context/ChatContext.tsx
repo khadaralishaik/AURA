@@ -5,13 +5,13 @@ import type { Conversation, Message } from "../types/chat";
 interface ChatContextType {
   messages: Message[];
   conversations: Conversation[];
-  conversationId: number | null;
+  conversationId: string | null;
   isTyping: boolean;
   error: string | null;
   sendMessage: (text: string) => Promise<void>;
   newChat: () => void;
   clearChat: () => void;
-  loadConversation: (id: number) => Promise<void>;
+  loadConversation: (id: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
 }
 
@@ -28,24 +28,31 @@ function loadMessages(): Message[] {
       const x = m as Partial<Message>;
       return typeof x.id === "number" && (x.sender === "user" || x.sender === "assistant") && typeof x.text === "string" && typeof x.timestamp === "string";
     });
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>(loadMessages);
-  const [conversationId, setConversationId] = useState<number | null>(() => {
-    const value = Number(localStorage.getItem(ID_KEY));
-    return Number.isFinite(value) && value > 0 ? value : null;
-  });
+  const [conversationId, setConversationId] = useState<string | null>(() => localStorage.getItem(ID_KEY));
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); }, [messages]);
-  useEffect(() => { if (conversationId) localStorage.setItem(ID_KEY, String(conversationId)); else localStorage.removeItem(ID_KEY); }, [conversationId]);
+  useEffect(() => {
+    if (conversationId) localStorage.setItem(ID_KEY, conversationId);
+    else localStorage.removeItem(ID_KEY);
+  }, [conversationId]);
 
   const refreshConversations = useCallback(async () => {
-    try { const { data } = await api.get<Conversation[]>("/chat/conversations"); setConversations(data); } catch { /* offline is handled by chat itself */ }
+    try {
+      const { data } = await api.get<Conversation[]>("/chat/conversations");
+      setConversations(data);
+    } catch {
+      // The chat request displays the actionable offline error.
+    }
   }, []);
 
   useEffect(() => {
@@ -62,20 +69,31 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setMessages(updated);
     setIsTyping(true);
     try {
-      const { data } = await api.post<{ reply: string; conversation_id: number }>("/chat/", { message: value, history: updated, conversation_id: conversationId });
+      const { data } = await api.post<{ reply: string; conversation_id: string }>("/chat/", {
+        message: value,
+        history: updated,
+        conversation_id: conversationId,
+      });
       setConversationId(data.conversation_id);
       setMessages(prev => [...prev, { id: Date.now() + 1, sender: "assistant", text: data.reply, timestamp: new Date().toISOString() }]);
       await refreshConversations();
     } catch {
       setError("AURA could not reach the backend. Check that the API is running.");
       setMessages(prev => [...prev, { id: Date.now() + 2, sender: "assistant", text: "⚠️ I couldn't reach the AURA backend. Please check the API connection and try again.", timestamp: new Date().toISOString() }]);
-    } finally { setIsTyping(false); }
+    } finally {
+      setIsTyping(false);
+    }
   }, [conversationId, isTyping, messages, refreshConversations]);
 
-  const newChat = useCallback(() => { setMessages([]); setConversationId(null); setError(null); localStorage.removeItem(STORAGE_KEY); }, []);
+  const newChat = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    setError(null);
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
   const clearChat = useCallback(() => { newChat(); }, [newChat]);
 
-  const loadConversation = useCallback(async (id: number) => {
+  const loadConversation = useCallback(async (id: string) => {
     const { data } = await api.get<Message[]>(`/chat/conversations/${id}`);
     setConversationId(id);
     setMessages(data.map((m, i) => ({ ...m, id: i + 1 })));
@@ -86,6 +104,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useChat() {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChat must be used inside ChatProvider");
