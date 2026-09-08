@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import api from "../services/api";
 import type { Message } from "../types/chat";
 
@@ -9,11 +9,43 @@ interface ChatContextType {
   clearChat: () => void;
 }
 
+const STORAGE_KEY = "aura.chat.history";
 const ChatContext = createContext<ChatContextType | null>(null);
 
+function loadMessages(): Message[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (message): message is Message =>
+        typeof message === "object" &&
+        message !== null &&
+        typeof (message as Message).id === "number" &&
+        (message as Message).sender === "user" ||
+        (typeof message === "object" && message !== null &&
+          typeof (message as Message).id === "number" &&
+          (message as Message).sender === "assistant") &&
+        typeof (message as Message).text === "string" &&
+        typeof (message as Message).timestamp === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // Storage can be unavailable in private/restricted browser contexts.
+    }
+  }, [messages]);
 
   async function sendMessage(text: string) {
     const value = text.trim();
@@ -49,8 +81,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function clearChat() {
+    setMessages([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage can be unavailable in private/restricted browser contexts.
+    }
+  }
+
   return (
-    <ChatContext.Provider value={{ messages, isTyping, sendMessage, clearChat: () => setMessages([]) }}>
+    <ChatContext.Provider value={{ messages, isTyping, sendMessage, clearChat }}>
       {children}
     </ChatContext.Provider>
   );
