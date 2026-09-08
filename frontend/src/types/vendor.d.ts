@@ -1,11 +1,11 @@
 declare module "react-syntax-highlighter" {
-  import type { ComponentType } from "react";
+  import type { ComponentType, ReactNode } from "react";
 
   export const Prism: ComponentType<{
     language?: string;
     style?: Record<string, unknown>;
     PreTag?: string;
-    children?: React.ReactNode;
+    children?: ReactNode;
   }>;
 }
 
