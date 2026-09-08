@@ -150,7 +150,7 @@ export default function GlobalVoiceAgent() {
     } catch {
       // Already stopped.
     }
-    speak(last.text.replace(/```[\s\S]*?```/g, "code omitted").replace(/[#*_`>\[\]]/g, ""));
+    speak(last.text.replace(/```[\s\S]*?```/g, "code omitted").replace(/[#*_`>\x5b\x5d]/g, ""));
     const duration = Math.min(Math.max(last.text.length * 45, 2500), 15000);
     window.setTimeout(() => {
       speakingRef.current = false;
