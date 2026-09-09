@@ -1,16 +1,21 @@
 import { useState } from "react";
-import { FaBrain, FaCalendarCheck, FaComments, FaCog, FaPlus, FaSearch } from "react-icons/fa";
+import { FaBrain, FaCalendarCheck, FaComments, FaCog, FaHome, FaPlus, FaSearch } from "react-icons/fa";
 import { useChat } from "../../context/ChatContext";
 
-export type View = "chat" | "memory" | "tasks" | "research" | "settings";
+export type View = "home" | "chat" | "memory" | "tasks" | "research" | "settings";
+
 export default function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) {
   const { newChat, conversations, loadConversation } = useChat();
   const [query, setQuery] = useState("");
   const visible = conversations.filter(c => c.title.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8);
+
   return <aside className="sidebar">
-    <div className="brand"><span className="brand-orb">A</span><span>AURA</span></div>
+    <button className="brand brand-button" onClick={() => setView("home")} aria-label="AURA home">
+      <span className="brand-orb">A</span><span>AURA</span>
+    </button>
     <button className="new-chat" onClick={() => { newChat(); setView("chat"); }}><FaPlus/> New chat</button>
     <nav>
+      <button className={view === "home" ? "nav-item selected" : "nav-item"} onClick={() => setView("home")}><FaHome/> Home</button>
       <button className={view === "chat" ? "nav-item selected" : "nav-item"} onClick={() => setView("chat")}><FaComments/> Chats</button>
       <button className={view === "memory" ? "nav-item selected" : "nav-item"} onClick={() => setView("memory")}><FaBrain/> Memory</button>
       <button className={view === "tasks" ? "nav-item selected" : "nav-item"} onClick={() => setView("tasks")}><FaCalendarCheck/> Tasks</button>
